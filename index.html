@@ -1,99 +1,81 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Tavus AI Agent</title>
-  <script src="https://unpkg.com/@daily-co/daily  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      background-color: #F8F9FA;
-      font-family: Arial, sans-serif;
-    }
-    .container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      height: 100%;
-      padding: 20px;
-    }
-    #startButton {
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: #2F80ED;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      margin-bottom: 20px;
-    }
-    #videoContainer {
-      width: 100%;
-      max-width: 1000px;
-      height: 80vh;
-      border: 1px solid #ccc;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Tavus AI Agent</title>
+    <script src="https://unpkg.com/@daily-co/daily-js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #F8F9FA;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        #startButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #2F80ED;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #videoContainer {
+            margin-top: 20px;
+            width: 100%;
+            height: 600px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
     <h1>Welcome to the Tavus AI Agent</h1>
     <p>Click the button below to start a new conversation.</p>
     <button id="startButton">Start Conversation</button>
     <div id="videoContainer"></div>
-  </div>
 
-  <script>
-    document.getElementById("startButton").onclick = async function() {
-      try {
-        const response = await fetch("https://tavusapi.com/v2/conversations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": "fa999107b41342fa8bc5255cc8c9dfe6"
-          },
-          body: JSON.stringify({
-            "replica_id": "rf4703150052",
-            "persona_id": "p43ff9e430ad",
-            "conversation_name": "Team Onboarding",
-            "custom_greeting": "Hi there! I'm your onboarding assistant."
-          })
-        });
+    <script>
+        document.getElementById("startButton").onclick = async function() {
+            const response = await fetch("https://tavusapi.com/v2/conversations", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": "fa999107b41342fa8bc5255cc8c9dfe6"
+                },
+                body: JSON.stringify({
+                    "replica_id": "rf4703150052",
+                    "persona_id": "p43ff9e430ad",
+                    "conversation_name": "Team Onboarding",
+                    "custom_greeting": "Hi there! I'm your onboarding assistant."
+                })
+            });
 
-        const data = await response.json();
-        const url = data.conversation_url;
+            const data = await response.json();
+            const url = data.conversation_url;
 
-        const callFrame = window.Daily.createFrame({
-          iframeStyle: {
-            width: "100%",
-            height: "100%",
-            border: "none"
-          },
-          showLeaveButton: true,
-          showFullscreenButton: true,
-          lang: "en",
-          theme: {
-            colors: {
-              accent: "#2F80ED",
-              background: "#F8F9FA",
-              baseText: "#1A1A1A"
-            }
-          }
-        });
+            const callFrame = window.Daily.createFrame({
+                iframeStyle: {
+                    position: "relative",
+                    width: "100%",
+                    height: "100%",
+                    border: "1px solid #ccc"
+                },
+                showLeaveButton: true,
+                showFullscreenButton: true,
+                lang: "en",
+                theme: {
+                    colors: {
+                        accent: "#2F80ED",
+                        background: "#F8F9FA",
+                        baseText: "#1A1A1A"
+                    }
+                }
+            });
 
-        callFrame.join({ url: url });
-        document.getElementById("videoContainer").innerHTML = "";
-        document.getElementById("videoContainer").appendChild(callFrame.iframe);
-      } catch (error) {
-        console.error("Error starting conversation:", error);
-        alert("Failed to start conversation. Please try again.");
-      }
-    };
-  </script>
+            callFrame.join({ url: url });
+            document.getElementById("videoContainer").appendChild(callFrame.iframe);
+        };
+    </script>
 </body>
 </html>
