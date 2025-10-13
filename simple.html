@@ -1,11 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Start Tavus Conversation</title>
+  <title>Talk to My AI Persona</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    #videoFrame {
+      width: 100%;
+      height: 100vh;
+      border: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>Start Tavus Conversation</h1>
-  <button onclick="startConversation()">Start</button>
+  <button onclick="startConversation()">Start Conversation</button>
+  <iframe id="videoFrame" style="display:none;"></iframe>
 
   <script>
     async function startConversation() {
@@ -13,23 +25,24 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": "YOUR_API_KEY_HERE" // Replace with your actual API key
+          "x-api-key": "YOUR_API_KEY_HERE"
         },
         body: JSON.stringify({
-          replica_id: "YOUR_REPLICA_ID",   // Replace with your replica ID
-          persona_id: "YOUR_PERSONA_ID",   // Replace with your persona ID
-          conversation_name: "Intro Chat"
+          replica_id: "YOUR_REPLICA_ID",
+          persona_id: "YOUR_PERSONA_ID",
+          conversation_name: "My First Embedded Chat"
         })
       });
 
       const data = await response.json();
 
-      if (data && data.conversation_id) {
-        // Redirect to Tavus conversation interface
-        window.location.href = `https://app.tavus.io/conversations/${data.conversation_id}`;
+      if (data.conversation_url) {
+        const iframe = document.getElementById("videoFrame");
+        iframe.src = data.conversation_url;
+        iframe.style.display = "block";
       } else {
-        alert("Failed to start conversation. Check console for details.");
-        console.error("Error:", data);
+        alert("Conversation failed to start.");
+        console.error(data);
       }
     }
   </script>
