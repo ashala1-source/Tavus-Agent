@@ -4,9 +4,8 @@
   <meta charset="UTF-8" />
   <title>Tavus AI Agent — Side-by-Side Chat (stable)</title>
 
-  <!-- ✅ Correct Daily.co SDK tag -->
-  <script src="https://unpkg.com/@daily-co/daily-js"></script>
-
+  <!-- Correct Daily.co SDK tag -->
+  <script src="https://unpkg.com/@daily-co/daily
   <style>
     :root {
       --accent: #2F80ED;
@@ -17,7 +16,6 @@
       --bot: #E8E8E8;
       --user: #DCF8C6;
     }
-
     * { box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
@@ -29,49 +27,30 @@
       align-items: center;
       color: var(--text);
     }
-
     h1 { margin: 0 0 4px; }
     p  { margin: 0 0 16px; color: #555; }
 
     #controls { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
-
     button.primary {
-      padding: 10px 16px;
-      background: --accent;
-      background: var(--accent);
-      color: #fff;
-      border: none; border-radius: 6px;
-      cursor: pointer; font-size: 14px;
+      padding: 10px 16px; background: var(--accent); color: #fff;
+      border: none; border-radius: 6px; cursor: pointer; font-size: 14px;
     }
     button.secondary {
-      padding: 8px 12px;
-      background: #fff;
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      border-radius: 6px; cursor: pointer;
-      font-size: 13px;
+      padding: 8px 12px; background: #fff; color: var(--accent);
+      border: 1px solid var(--accent); border-radius: 6px; cursor: pointer; font-size: 13px;
     }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
 
     #mainContainer {
       display: flex; flex-direction: row;
-      width: 100%; max-width: 1200px; gap: 20px;
-      align-items: stretch;
+      width: 100%; max-width: 1200px; gap: 20px; align-items: stretch;
     }
-
     #videoPanel, #chatPanel {
-      background: var(--panel);
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      overflow: hidden;
+      background: var(--panel); border: 1px solid #ccc; border-radius: 8px; overflow: hidden;
     }
-
     #videoPanel {
-      flex: 2; min-height: 640px;
-      display: flex; align-items: stretch; justify-content: stretch;
+      flex: 2; min-height: 640px; display: flex; align-items: stretch; justify-content: stretch;
     }
-
-    /* The iframe Daily inserts will fill the panel */
     #videoPanel iframe {
       width: 100%; height: 640px; border: 0;
       opacity: 0; transition: opacity .3s ease-in-out;
@@ -81,35 +60,27 @@
     #chatPanel { flex: 1; display: flex; flex-direction: column; }
     #chatHeader {
       padding: 10px 12px; border-bottom: 1px solid var(--muted);
-      display: flex; justify-content: space-between; align-items: center;
-      background: #fafafa;
+      display: flex; justify-content: space-between; align-items: center; background: #fafafa;
     }
     #chatMessages {
       padding: 12px; flex: 1; overflow-y: auto;
       display: flex; flex-direction: column; gap: 8px;
     }
     .msg {
-      max-width: 90%;
-      padding: 8px 10px; border-radius: 8px; line-height: 1.35;
+      max-width: 90%; padding: 8px 10px; border-radius: 8px; line-height: 1.35;
       white-space: pre-wrap; word-break: break-word;
     }
     .msg.user { align-self: flex-end; background: var(--user); }
     .msg.bot  { align-self: flex-start; background: var(--bot); }
     .meta { font-size: 11px; color: #666; margin-top: 4px; }
 
-    #chatInput {
-      border-top: 1px solid var(--muted);
-      padding: 8px; display: flex; gap: 8px;
-    }
+    #chatInput { border-top: 1px solid var(--muted); padding: 8px; display: flex; gap: 8px; }
     #messageInput {
-      flex: 1; padding: 10px 12px; border-radius: 6px;
-      border: 1px solid #ddd; font-size: 14px;
+      flex: 1; padding: 10px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;
     }
     #sendButton { min-width: 96px; }
-    #statusBar {
-      margin-top: 10px; font-size: 12px; color: #666;
-      min-height: 16px;
-    }
+
+    #statusBar { margin-top: 10px; font-size: 12px; color: #666; min-height: 16px; }
     code.inline { background: #f3f3f3; padding: 0 4px; border-radius: 4px; }
   </style>
 </head>
@@ -123,7 +94,7 @@
   </div>
 
   <div id="mainContainer">
-    <div id="videoPanel"><!-- Daily iframe will be created inside this container --></div>
+    <div id="videoPanel"><!-- Daily iframe or fallback iframe goes here --></div>
 
     <div id="chatPanel">
       <div id="chatHeader">
@@ -141,16 +112,16 @@
   <div id="statusBar"></div>
 
   <script>
-    // ---------- Configuration (replace with your own values) ----------
-    // ⚠️ SECURITY: Do not expose real API keys in public repos/production.
-    const TAVUS_API_KEY = "fa999107b41342fa8bc5255cc8c9dfe6"; // move to a server-side proxy for production
+    // ----------------- Configuration -----------------
+    // ⚠️ Do NOT expose real keys in public repos. Use a proxy for production.
+    const TAVUS_API_KEY = "fa999107b41342fa8bc5255cc8c9dfe6";
     const REPLICA_ID    = "rf4703150052";
-    const PERSONA_ID    = "pa6975faa9dc";  // ensure matches your Tavus persona
+    const PERSONA_ID    = "pa6975faa9dc";
     const GREETING      = "Hi there! I'm your onboarding assistant.";
 
-    // ---------- UI Helpers ----------
+    // ----------------- UI helpers -----------------
     const $ = (sel) => document.querySelector(sel);
-    const status = (text) => $("#statusBar").textContent = text || "";
+    const status = (t) => $("#statusBar").textContent = t || "";
 
     const addMsg = (text, who = "bot") => {
       if (!text) return;
@@ -161,16 +132,24 @@
       $("#chatMessages").scrollTop = $("#chatMessages").scrollHeight;
     };
 
-    // ---------- Daily/Tavus state ----------
-    let call = null;
-    let conversationId = null;
-
-    // In some builds Daily exposes window.Daily, in others window.DailyIframe.
+    // ----------------- Daily helpers -----------------
     function getDailyGlobal() {
+      // Daily UMD builds expose either window.Daily or window.DailyIframe
       return window.Daily || window.DailyIframe || null;
     }
 
-    // Extract text from Tavus payloads sent over app-message
+    function waitForDaily(maxMs = 5000, intervalMs = 150) {
+      return new Promise((resolve, reject) => {
+        const t0 = Date.now();
+        (function poll() {
+          const g = getDailyGlobal();
+          if (g && typeof g.createFrame === "function") return resolve(g);
+          if (Date.now() - t0 >= maxMs) return reject(new Error("Daily SDK not available"));
+          setTimeout(poll, intervalMs);
+        })();
+      });
+    }
+
     function extractUtteranceText(msg) {
       const speech = msg?.properties?.speech ?? {};
       return speech.text || speech.transcript || speech.content || msg?.properties?.text || "";
@@ -180,15 +159,16 @@
       return (speech.speaker === "replica") || (speech.role === "replica") || (msg?.speaker === "replica");
     }
 
-    // ---------- Tavus: Create conversation ----------
+    // ----------------- State -----------------
+    let call = null;
+    let conversationId = null;
+
+    // ----------------- Tavus: create conversation -----------------
     async function createConversation() {
       status("Creating conversation…");
       const res = await fetch("https://tavusapi.com/v2/conversations", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": TAVUS_API_KEY
-        },
+        headers: { "Content-Type": "application/json", "x-api-key": TAVUS_API_KEY },
         body: JSON.stringify({
           replica_id: REPLICA_ID,
           persona_id: PERSONA_ID,
@@ -196,7 +176,6 @@
           custom_greeting: GREETING
         })
       });
-
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(`Create conversation failed (${res.status}): ${errText}`);
@@ -205,58 +184,66 @@
       return { id: data.conversation_id, url: data.conversation_url };
     }
 
-    // ---------- Start / Leave ----------
+    // ----------------- Start / Leave -----------------
     async function startConversation() {
       $("#startBtn").disabled = true;
       $("#sendButton").disabled = true;
       status("");
 
       try {
-        const DailyGlobal = getDailyGlobal();
-        if (!DailyGlobal || typeof DailyGlobal.createFrame !== "function") {
-          throw new Error("Daily SDK failed to load. Check the <script src> and the Network tab.");
+        // Ensure Daily is ready (or we'll fallback)
+        let DailyGlobal = null;
+        try {
+          DailyGlobal = await waitForDaily(6000);
+        } catch (e) {
+          console.warn("Daily SDK not ready, will use fallback iframe.", e);
         }
 
         const { id, url } = await createConversation();
         conversationId = id;
         $("#convIdLabel").textContent = conversationId ? `ID: ${conversationId}` : "";
 
-        // ✅ Pass the container to createFrame(); Daily will create & insert the iframe itself
-        call = DailyGlobal.createFrame(
-          document.getElementById("videoPanel"),
-          {
+        const videoPanel = $("#videoPanel");
+
+        if (DailyGlobal) {
+          // Preferred path: let Daily create & attach the iframe to the container.
+          call = DailyGlobal.createFrame(videoPanel, {
             iframeStyle: { width: "100%", height: "640px", border: "0" },
             showLeaveButton: true,
             showFullscreenButton: true,
             lang: "en",
-            theme: {
-              colors: {
-                accent: "#2F80ED",
-                background: "#F8F9FA",
-                baseText: "#1A1A1A"
-              }
+            theme: { colors: { accent: "#2F80ED", background: "#F8F9FA", baseText: "#1A1A1A" } }
+          });
+
+          // Fade in on load
+          if (call && call.iframe) {
+            call.iframe.onload = () => call.iframe.classList.add("loaded");
+          }
+
+          // Listen for app-message events from the avatar
+          call.on("app-message", (event) => {
+            const msg = event?.data || event;
+            const type = msg?.event_type || "";
+            if (type === "conversation.utterance") {
+              const text = extractUtteranceText(msg);
+              if (text) addMsg(text, isReplicaUtterance(msg) ? "bot" : "user");
             }
-          }
-        );
+          });
 
-        // Fade-in when the Daily iframe finishes loading
-        if (call && call.iframe) {
-          call.iframe.onload = () => call.iframe.classList.add("loaded");
+          // Join the Daily room
+          await call.join({ url });
+        } else {
+          // Fallback: show the conversation in a plain iframe so the page is never blank.
+          const iframe = document.createElement("iframe");
+          iframe.src = url;
+          iframe.allow = "camera; microphone; autoplay; display-capture";
+          iframe.style.width = "100%";
+          iframe.style.height = "640px";
+          iframe.style.border = "0";
+          iframe.addEventListener("load", () => iframe.classList.add("loaded"));
+          videoPanel.innerHTML = "";
+          videoPanel.appendChild(iframe);
         }
-
-        // Listen for Tavus interaction messages over Daily's app-message channel
-        call.on("app-message", (event) => {
-          const msg = event?.data || event;
-          const type = msg?.event_type || "";
-          if (type === "conversation.utterance") {
-            const text = extractUtteranceText(msg);
-            if (text) addMsg(text, isReplicaUtterance(msg) ? "bot" : "user");
-          }
-          // console.log("app-message:", msg); // helpful while debugging
-        });
-
-        // Join the Daily room from Tavus
-        await call.join({ url });
 
         $("#sendButton").disabled = false;
         $("#leaveBtn").disabled = false;
@@ -285,13 +272,13 @@
       }
     }
 
-    // ---------- Send text to the avatar via app-message ----------
+    // ----------------- Send text via app-message -----------------
     function sendTextToAvatar(text) {
-      if (!call || !conversationId) {
-        status("No active conversation.");
-        return;
-      }
+      if (!conversationId) { status("No active conversation."); return; }
       if (!text) return;
+
+      // If we don't have a Daily call (fallback path), we can't send app-messages.
+      if (!call) { status("Text chat unavailable in fallback mode."); return; }
 
       const interaction = {
         message_type: "conversation",
@@ -308,7 +295,7 @@
       }
     }
 
-    // ---------- UI wiring ----------
+    // ----------------- UI wiring -----------------
     $("#startBtn").addEventListener("click", startConversation);
     $("#leaveBtn").addEventListener("click", leaveConversation);
 
@@ -329,11 +316,10 @@
       }
     });
 
-    // Surface runtime errors in the UI so you never see a “blank” screen again
+    // Surface runtime errors in the UI instead of a blank page
     window.addEventListener("error", (ev) => { status(`Error: ${ev.message}`); });
     window.addEventListener("unhandledrejection", (ev) => {
       status(`Error: ${ev.reason?.message || ev.reason || "Unhandled promise rejection"}`);
     });
   </script>
 </body>
-</html>
