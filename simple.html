@@ -13,18 +13,24 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": "fa999107b41342fa8bc5255cc8c9dfe6" // Replace with your actual API key
+          "x-api-key": "YOUR_API_KEY_HERE" // Replace with your actual API key
         },
         body: JSON.stringify({
-          replica_id: "rf4703150052",   // Replace with your replica ID
-          persona_id: "pa6975faa9dc",   // Replace with your persona ID
+          replica_id: "YOUR_REPLICA_ID",   // Replace with your replica ID
+          persona_id: "YOUR_PERSONA_ID",   // Replace with your persona ID
           conversation_name: "Intro Chat"
         })
       });
 
       const data = await response.json();
-      console.log("Conversation started:", data);
-      alert("Conversation started! Check console for details.");
+
+      if (data && data.conversation_id) {
+        // Redirect to Tavus conversation interface
+        window.location.href = `https://app.tavus.io/conversations/${data.conversation_id}`;
+      } else {
+        alert("Failed to start conversation. Check console for details.");
+        console.error("Error:", data);
+      }
     }
   </script>
 </body>
