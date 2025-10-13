@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Tavus AI Agent — Side-by-Side Chat v1 (fixed)</title>
+  <title>Tavus AI Agent — Side-by-Side Chat v1 (container createFrame)</title>
 
-  <!-- Daily.co SDK (must load successfully before using window.Daily) -->
-  <script src="https://unpkg.com/@daily-co/daily-js"></script>
+  <!-- Daily.co SDK (UMD build). This must load successfully. -->
+  https://unpkg.com/@daily-co/daily-js</script>
 
   <style>
     :root {
@@ -33,9 +33,7 @@
     h1 { margin: 0 0 4px; }
     p  { margin: 0 0 16px; color: #555; }
 
-    #controls {
-      display: flex; gap: 10px; align-items: center; margin-bottom: 12px;
-    }
+    #controls { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
 
     button.primary {
       padding: 10px 16px;
@@ -69,8 +67,10 @@
 
     #videoPanel {
       flex: 2; min-height: 640px;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: stretch; justify-content: stretch;
     }
+
+    /* The iframe Daily inserts will fill the panel */
     #videoPanel iframe {
       width: 100%; height: 640px; border: 0;
       opacity: 0; transition: opacity .3s ease-in-out;
@@ -122,9 +122,7 @@
   </div>
 
   <div id="mainContainer">
-    <div id="videoPanel">
-      <!-- Daily iframe will be injected here -->
-    </div>
+    <div id="videoPanel"><!-- Daily iframe will be created inside this container --></div>
 
     <div id="chatPanel">
       <div id="chatHeader">
@@ -143,10 +141,10 @@
 
   <script>
     // ---------- Configuration (replace with your own values) ----------
-    // ⚠️ SECURITY: Do not expose real API keys in public repos or production.
-    const TAVUS_API_KEY = "fa999107b41342fa8bc5255cc8c9dfe6"; // TODO: move to server-side/proxy
+    // ⚠️ SECURITY: Do not expose real API keys in public repos/production.
+    const TAVUS_API_KEY = "fa999107b41342fa8bc5255cc8c9dfe6"; // move to server-side proxy for production
     const REPLICA_ID    = "rf4703150052";
-    const PERSONA_ID    = "pa6975faa9dc";
+    const PERSONA_ID    = "pa6975faa9dc"; // ensure this is correct in your Tavus portal
     const GREETING      = "Hi there! I'm your onboarding assistant.";
 
     // ---------- UI Helpers ----------
@@ -162,16 +160,20 @@
       $("#chatMessages").scrollTop = $("#chatMessages").scrollHeight;
     };
 
-    // ---------- Daily call state ----------
+    // ---------- Daily/Tavus state ----------
     let call = null;
     let conversationId = null;
 
-    // Safely pick text from a variety of possible fields
+    // Fallback to either window.Daily or window.DailyIframe (different UMD globals)
+    function getDailyGlobal() {
+      return window.Daily || window.DailyIframe || null;
+    }
+
+    // Extract speech text from Tavus app-message payloads (be tolerant)
     function extractUtteranceText(msg) {
       const speech = msg?.properties?.speech ?? {};
       return speech.text || speech.transcript || speech.content || msg?.properties?.text || "";
     }
-
     function isReplicaUtterance(msg) {
       const speech = msg?.properties?.speech ?? {};
       return (speech.speaker === "replica") || (speech.role === "replica") || (msg?.speaker === "replica");
@@ -191,7 +193,6 @@
           persona_id: PERSONA_ID,
           conversation_name: "Team Onboarding",
           custom_greeting: GREETING
-          // Optional: conversational_context, memory stores, etc.
         })
       });
 
@@ -201,72 +202,64 @@
       }
 
       const data = await res.json();
-      return {
-        id: data.conversation_id,
-        url: data.conversation_url
-      };
+      return { id: data.conversation_id, url: data.conversation_url };
     }
 
-    // ---------- Join call via Daily and wire interactions ----------
+    // ---------- Start / Leave ----------
     async function startConversation() {
       $("#startBtn").disabled = true;
       $("#sendButton").disabled = true;
       status("");
 
       try {
-        if (!window.Daily || typeof window.Daily.createFrame !== "function") {
-          throw new Error("Daily SDK failed to load. Check the <script> tag.");
+        const DailyGlobal = getDailyGlobal();
+        if (!DailyGlobal || typeof DailyGlobal.createFrame !== "function") {
+          throw new Error("Daily SDK failed to load. Check the <script src> URL and network.");
         }
 
         const { id, url } = await createConversation();
         conversationId = id;
         $("#convIdLabel").textContent = conversationId ? `ID: ${conversationId}` : "";
 
-        // 1) Create the Daily frame
-        call = window.Daily.createFrame({
-          iframeStyle: { width: "100%", height: "640px", border: "0" },
-          showLeaveButton: true,
-          showFullscreenButton: true,
-          lang: "en",
-          theme: {
-            colors: {
-              accent: "#2F80ED",
-              background: "#F8F9FA",
-              baseText: "#1A1A1A"
+        // IMPORTANT: Pass the container to createFrame(). Daily will create & append the iframe.
+        call = DailyGlobal.createFrame(
+          document.getElementById("videoPanel"),
+          {
+            iframeStyle: { width: "100%", height: "640px", border: "0" },
+            showLeaveButton: true,
+            showFullscreenButton: true,
+            lang: "en",
+            theme: {
+              colors: {
+                accent: "#2F80ED",
+                background: "#F8F9FA",
+                baseText: "#1A1A1A"
+              }
             }
           }
-        });
+        );
 
-        // 2) Append the iframe RIGHT AWAY (fix for appendChild error)
-        if (call && call.iframe && call.iframe.nodeType === Node.ELEMENT_NODE) {
-          $("#videoPanel").appendChild(call.iframe);
-        } else {
-          throw new Error("Daily frame did not create a valid iframe element.");
+        // The iframe exists immediately now; we can hook onload for a fade-in.
+        if (call && call.iframe) {
+          call.iframe.onload = () => call.iframe.classList.add("loaded");
         }
 
-        // 3) Fade in when loaded
-        call.iframe.onload = () => call.iframe.classList.add("loaded");
-
-        // 4) Listen for messages from the avatar (replica)
+        // Listen for Tavus interaction messages flowing over Daily's app-message channel
         call.on("app-message", (event) => {
-          // event.data should carry the Tavus interaction payload if configured
           const msg = event?.data || event;
           const type = msg?.event_type || "";
 
           if (type === "conversation.utterance") {
             const text = extractUtteranceText(msg);
-            if (text) {
-              addMsg(text, isReplicaUtterance(msg) ? "bot" : "user");
-            }
+            if (text) addMsg(text, isReplicaUtterance(msg) ? "bot" : "user");
           }
-          // You can log to inspect other message types:
+          // For debugging:
           // console.log("app-message:", msg);
         });
 
-        // 5) Join the room
+        // Join the Daily room provided by Tavus
         await call.join({ url });
 
-        // 6) Enable controls
         $("#sendButton").disabled = false;
         $("#leaveBtn").disabled = false;
         status("Connected. You can chat now.");
@@ -294,7 +287,7 @@
       }
     }
 
-    // ---------- Send a text message to the avatar ----------
+    // ---------- Send text to the avatar via app-message ----------
     function sendTextToAvatar(text) {
       if (!call || !conversationId) {
         status("No active conversation.");
@@ -302,16 +295,11 @@
       }
       if (!text) return;
 
-      // This uses Daily's app-message channel to signal the CVI/replica.
-      // Ensure your Tavus configuration supports receiving text via app-message.
       const interaction = {
         message_type: "conversation",
-        event_type: "conversation.respond", // instructs the replica to respond to provided text
+        event_type: "conversation.respond",
         conversation_id: conversationId,
-        properties: {
-          modality: "text",
-          text
-        }
+        properties: { modality: "text", text }
       };
 
       try {
@@ -322,7 +310,7 @@
       }
     }
 
-    // ---------- Wire up UI ----------
+    // ---------- UI wiring ----------
     $("#startBtn").addEventListener("click", startConversation);
     $("#leaveBtn").addEventListener("click", leaveConversation);
 
@@ -330,13 +318,8 @@
       const input = $("#messageInput");
       const text = input.value.trim();
       if (!text) return;
-
-      // Show user's message immediately
       addMsg(text, "user");
-
-      // Send to Tavus replica
       sendTextToAvatar(text);
-
       input.value = "";
       input.focus();
     });
@@ -348,10 +331,8 @@
       }
     });
 
-    // Global safety net to surface errors in the UI
-    window.addEventListener("error", (ev) => {
-      status(`Error: ${ev.message}`);
-    });
+    // Show runtime errors in the UI
+    window.addEventListener("error", (ev) => { status(`Error: ${ev.message}`); });
     window.addEventListener("unhandledrejection", (ev) => {
       status(`Error: ${ev.reason?.message || ev.reason || "Unhandled promise rejection"}`);
     });
