@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tavus AI Agent — Side-by-Side Chat v1 (fixed)</title>
+
+  <!-- Daily.co SDK (must load successfully before using window.Daily) -->
+  https://unpkg.com/@daily-co/daily-js</script>
+
+  <style>
+    :root {
+      --accent: #2F80ED;
+      --bg: #F8F9FA;
+      --text: #1A1A1A;
+      --panel: #FFFFFF;
+      --muted: #EDEDED;
+      --bot: #E8E8E8;
+      --user: #DCF8C6;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: var(--text);
+    }
+
+    h1 { margin: 0 0 4px; }
+    p  { margin: 0 0 16px; color: #555; }
+
+    #controls {
+      display: flex; gap: 10px; align-items: center; margin-bottom: 12px;
+    }
+
+    button.primary {
+      padding: 10px 16px;
+      background: var(--accent);
+      color: #fff;
+      border: none; border-radius: 6px;
+      cursor: pointer; font-size: 14px;
+    }
+    button.secondary {
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 6px; cursor: pointer;
+      font-size: 13px;
+    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    #mainContainer {
+      display: flex; flex-direction: row;
+      width: 100%; max-width: 1200px; gap: 20px;
+      align-items: stretch;
+    }
+
+    #videoPanel, #chatPanel {
+      background: var(--panel);
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #videoPanel {
+      flex: 2; min-height: 640px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #videoPanel iframe {
+      width: 100%; height: 640px; border: 0;
+      opacity: 0; transition: opacity .3s ease-in-out;
+    }
+    #videoPanel iframe.loaded { opacity: 1; }
+
+    #chatPanel { flex: 1; display: flex; flex-direction: column; }
+    #chatHeader {
+      padding: 10px 12px; border-bottom: 1px solid var(--muted);
+      display: flex; justify-content: space-between; align-items: center;
+      background: #fafafa;
+    }
+    #chatMessages {
+      padding: 12px; flex: 1; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .msg {
+      max-width: 90%;
+      padding: 8px 10px; border-radius: 8px; line-height: 1.35;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .msg.user { align-self: flex-end; background: var(--user); }
+    .msg.bot  { align-self: flex-start; background: var(--bot); }
+    .meta { font-size: 11px; color: #666; margin-top: 4px; }
+
+    #chatInput {
+      border-top: 1px solid var(--muted);
+      padding: 8px; display: flex; gap: 8px;
+    }
+    #messageInput {
+      flex: 1; padding: 10px 12px; border-radius: 6px;
+      border: 1px solid #ddd; font-size: 14px;
+    }
+    #sendButton { min-width: 96px; }
+    #statusBar {
+      margin-top: 10px; font-size: 12px; color: #666;
+      min-height: 16px;
+    }
+    code.inline { background: #f3f3f3; padding: 0 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Tavus AI Agent</h1>
+  <p>Start a video conversation and chat with the avatar via text.</p>
+
+  <div id="controls">
+    <button id="startBtn" class="primary">Start Conversation</button>
+    <button id="leaveBtn" class="secondary" disabled>Leave</button>
+  </div>
+
+  <div id="mainContainer">
+    <div id="videoPanel">
+      <!-- Daily iframe will be injected here -->
+    </div>
+
+    <div id="chatPanel">
+      <div id="chatHeader">
+        <strong>Chat</strong>
+        <span id="convIdLabel" class="meta"></span>
+      </div>
+      <div id="chatMessages"></div>
+      <div id="chatInput">
+        <input id="messageInput" type="text" placeholder="Type a message…" autocomplete="off" />
+        <button id="sendButton" class="primary" disabled>Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="statusBar"></div>
+
+  <script>
+    // ---------- Configuration (replace with your own values) ----------
+    // ⚠️ SECURITY: Do not expose real API keys in public repos or production.
+    const TAVUS_API_KEY = "fa999107b41342fa8bc5255cc8c9dfe6"; // TODO: move to server-side/proxy
+    const REPLICA_ID    = "rf4703150052";
+    const PERSONA_ID    = "pa6975faa9dc";
+    const GREETING      = "Hi there! I'm your onboarding assistant.";
+
+    // ---------- UI Helpers ----------
+    const $ = (sel) => document.querySelector(sel);
+    const status = (text) => $("#statusBar").textContent = text || "";
+
+    const addMsg = (text, who = "bot") => {
+      if (!text) return;
+      const el = document.createElement("div");
+      el.className = `msg ${who}`;
+      el.textContent = text;
+      $("#chatMessages").appendChild(el);
+      $("#chatMessages").scrollTop = $("#chatMessages").scrollHeight;
+    };
+
+    // ---------- Daily call state ----------
+    let call = null;
+    let conversationId = null;
+
+    // Safely pick text from a variety of possible fields
+    function extractUtteranceText(msg) {
+      const speech = msg?.properties?.speech ?? {};
+      return speech.text || speech.transcript || speech.content || msg?.properties?.text || "";
+    }
+
+    function isReplicaUtterance(msg) {
+      const speech = msg?.properties?.speech ?? {};
+      return (speech.speaker === "replica") || (speech.role === "replica") || (msg?.speaker === "replica");
+    }
+
+    // ---------- Tavus: Create conversation ----------
+    async function createConversation() {
+      status("Creating conversation…");
+      const res = await fetch("https://tavusapi.com/v2/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": TAVUS_API_KEY
+        },
+        body: JSON.stringify({
+          replica_id: REPLICA_ID,
+          persona_id: PERSONA_ID,
+          conversation_name: "Team Onboarding",
+          custom_greeting: GREETING
+          // Optional: conversational_context, memory stores, etc.
+        })
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Create conversation failed (${res.status}): ${errText}`);
+      }
+
+      const data = await res.json();
+      return {
+        id: data.conversation_id,
+        url: data.conversation_url
+      };
+    }
+
+    // ---------- Join call via Daily and wire interactions ----------
+    async function startConversation() {
+      $("#startBtn").disabled = true;
+      $("#sendButton").disabled = true;
+      status("");
+
+      try {
+        if (!window.Daily || typeof window.Daily.createFrame !== "function") {
+          throw new Error("Daily SDK failed to load. Check the <script> tag.");
+        }
+
+        const { id, url } = await createConversation();
+        conversationId = id;
+        $("#convIdLabel").textContent = conversationId ? `ID: ${conversationId}` : "";
+
+        // 1) Create the Daily frame
+        call = window.Daily.createFrame({
+          iframeStyle: { width: "100%", height: "640px", border: "0" },
+          showLeaveButton: true,
+          showFullscreenButton: true,
+          lang: "en",
+          theme: {
+            colors: {
+              accent: "#2F80ED",
+              background: "#F8F9FA",
+              baseText: "#1A1A1A"
+            }
+          }
+        });
+
+        // 2) Append the iframe RIGHT AWAY (fix for appendChild error)
+        if (call && call.iframe && call.iframe.nodeType === Node.ELEMENT_NODE) {
+          $("#videoPanel").appendChild(call.iframe);
+        } else {
+          throw new Error("Daily frame did not create a valid iframe element.");
+        }
+
+        // 3) Fade in when loaded
+        call.iframe.onload = () => call.iframe.classList.add("loaded");
+
+        // 4) Listen for messages from the avatar (replica)
+        call.on("app-message", (event) => {
+          // event.data should carry the Tavus interaction payload if configured
+          const msg = event?.data || event;
+          const type = msg?.event_type || "";
+
+          if (type === "conversation.utterance") {
+            const text = extractUtteranceText(msg);
+            if (text) {
+              addMsg(text, isReplicaUtterance(msg) ? "bot" : "user");
+            }
+          }
+          // You can log to inspect other message types:
+          // console.log("app-message:", msg);
+        });
+
+        // 5) Join the room
+        await call.join({ url });
+
+        // 6) Enable controls
+        $("#sendButton").disabled = false;
+        $("#leaveBtn").disabled = false;
+        status("Connected. You can chat now.");
+      } catch (e) {
+        console.error(e);
+        status(e.message || "Failed to start conversation.");
+        $("#startBtn").disabled = false;
+      }
+    }
+
+    async function leaveConversation() {
+      try {
+        if (call) {
+          await call.leave();
+          call.destroy();
+          call = null;
+        }
+      } finally {
+        conversationId = null;
+        $("#convIdLabel").textContent = "";
+        $("#sendButton").disabled = true;
+        $("#leaveBtn").disabled = true;
+        $("#startBtn").disabled = false;
+        status("Left the conversation.");
+      }
+    }
+
+    // ---------- Send a text message to the avatar ----------
+    function sendTextToAvatar(text) {
+      if (!call || !conversationId) {
+        status("No active conversation.");
+        return;
+      }
+      if (!text) return;
+
+      // This uses Daily's app-message channel to signal the CVI/replica.
+      // Ensure your Tavus configuration supports receiving text via app-message.
+      const interaction = {
+        message_type: "conversation",
+        event_type: "conversation.respond", // instructs the replica to respond to provided text
+        conversation_id: conversationId,
+        properties: {
+          modality: "text",
+          text
+        }
+      };
+
+      try {
+        call.sendAppMessage(interaction, "*");
+      } catch (err) {
+        console.error(err);
+        status("Failed to send message to avatar.");
+      }
+    }
+
+    // ---------- Wire up UI ----------
+    $("#startBtn").addEventListener("click", startConversation);
+    $("#leaveBtn").addEventListener("click", leaveConversation);
+
+    $("#sendButton").addEventListener("click", () => {
+      const input = $("#messageInput");
+      const text = input.value.trim();
+      if (!text) return;
+
+      // Show user's message immediately
+      addMsg(text, "user");
+
+      // Send to Tavus replica
+      sendTextToAvatar(text);
+
+      input.value = "";
+      input.focus();
+    });
+
+    $("#messageInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !$("#sendButton").disabled) {
+        e.preventDefault();
+        $("#sendButton").click();
+      }
+    });
+
+    // Global safety net to surface errors in the UI
+    window.addEventListener("error", (ev) => {
+      status(`Error: ${ev.message}`);
+    });
+    window.addEventListener("unhandledrejection", (ev) => {
+      status(`Error: ${ev.reason?.message || ev.reason || "Unhandled promise rejection"}`);
+    });
+  </script>
+</body>
+</html>
