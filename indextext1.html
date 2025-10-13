@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <title>Tavus AI Agent — Side-by-Side Chat v1</title>
 
-  <script src="https://unpkg.com/@daily-co/daily-js"></script>
+  <!-- ✅ Correctly load the Daily JS SDK -->
+  https://unpkg.com/@daily-co/daily-js</script>
 
   <style>
     :root {
@@ -164,7 +165,6 @@
     let call = null;
     let conversationId = null;
 
-    // Safely pick text from a variety of possible fields
     function extractUtteranceText(msg) {
       const speech = msg?.properties?.speech ?? {};
       return speech.text || speech.transcript || speech.content || msg?.properties?.text || "";
@@ -172,7 +172,6 @@
 
     function isReplicaUtterance(msg) {
       const speech = msg?.properties?.speech ?? {};
-      // Try common speaker indicators
       return (speech.speaker === "replica") || (speech.role === "replica") || (msg?.speaker === "replica");
     }
 
@@ -191,7 +190,6 @@
           persona_id: PERSONA_ID,
           conversation_name: "Team Onboarding",
           custom_greeting: GREETING
-          // You can also pass conversational_context if helpful
         })
       });
 
@@ -201,7 +199,6 @@
       }
 
       const data = await res.json();
-      // data includes conversation_id + conversation_url (Daily link)
       return {
         id: data.conversation_id,
         url: data.conversation_url
@@ -214,6 +211,14 @@
       $("#sendButton").disabled = true;
 
       try {
+        // ✅ Guard: verify Daily SDK is present
+        if (!window.Daily || !window.Daily.createFrame) {
+          console.error("[Debug] Daily SDK not loaded. window.Daily:", window.Daily);
+          status("Daily SDK failed to load. Check the <script src> tag and network.");
+          $("#startBtn").disabled = false;
+          return;
+        }
+
         const { id, url } = await createConversation();
         conversationId = id;
         $("#convIdLabel").textContent = conversationId ? `ID: ${conversationId}` : "";
@@ -240,10 +245,8 @@
         call.on("app-message", (event) => {
           const msg = event?.data || event;
           const type = msg?.event_type || "";
-          // Debug trace of incoming messages (optional; can be noisy)
           console.debug("[Debug] app-message received:", msg);
 
-          // Display replica utterances in the chat
           if (type === "conversation.utterance") {
             const text = extractUtteranceText(msg);
             if (isReplicaUtterance(msg)) {
@@ -254,7 +257,6 @@
           }
         });
 
-        // Guard on iframe presence before assigning onload
         if (call && call.iframe) {
           call.iframe.onload = () => {
             console.log("[Debug] Daily iframe onload fired");
@@ -264,7 +266,6 @@
           console.warn("[Debug] No iframe available immediately after createFrame()");
         }
 
-        // Join the Daily room for the conversation
         await call.join({ url });
         console.log("[Debug] Joined Daily room with URL:", url);
 
@@ -318,15 +319,14 @@
 
       const interaction = {
         message_type: "conversation",
-        event_type: "conversation.respond", // instructs the replica to respond to provided text
+        event_type: "conversation.respond",
         conversation_id: conversationId,
         properties: {
-          modality: "text", // explicit modality (text or audio)
+          modality: "text",
           text: text
         }
       };
 
-      // Deliver over Daily's app-message channel to the CVI
       call.sendAppMessage(interaction, "*");
       console.log("[Debug] Sent text to avatar:", interaction);
     }
@@ -340,13 +340,8 @@
       const text = input.value.trim();
       if (!text) return;
 
-      // Show user's message immediately
       addMsg(text, "user");
-
-      // Send to Tavus replica
       sendTextToAvatar(text);
-
-      // UX nicety
       input.value = "";
       input.focus();
     });
