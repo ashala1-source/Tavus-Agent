@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <title>Tavus AI Agent — Side-by-Side Chat v1</title>
 
-  <script src="https://unpkg.com/@daily-co/daily-js"></script>
-
+  <script src="https://unpkg.comily-js</script>
 
   <style>
     :root {
@@ -142,13 +141,11 @@
   <div id="statusBar"></div>
 
   <script>
-    // ---------- Configuration (replace with your own values) ----------
-    const TAVUS_API_KEY   = "fa999107b41342fa8bc5255cc8c9dfe6";   // ⚠️ Don't commit to public repos
+    const TAVUS_API_KEY   = "fa999107b41342fa8bc5255cc8c9dfe6";
     const REPLICA_ID      = "rf4703150052";
     const PERSONA_ID      = "pa6975faa9dc";
     const GREETING        = "Hi there! I'm your onboarding assistant.";
 
-    // ---------- UI Helpers ----------
     const $ = (sel) => document.querySelector(sel);
     const status = (text) => $("#statusBar").textContent = text || "";
 
@@ -161,25 +158,19 @@
       $("#chatMessages").scrollTop = $("#chatMessages").scrollHeight;
     };
 
-    // ---------- Daily call state ----------
     let call = null;
     let conversationId = null;
 
-    // Safely pick text from a variety of possible fields
     function extractUtteranceText(msg) {
-      // Tavus utterance events carry content under properties.speech
-      // We check a few likely fields to be robust
       const speech = msg?.properties?.speech ?? {};
       return speech.text || speech.transcript || speech.content || msg?.properties?.text || "";
     }
 
     function isReplicaUtterance(msg) {
       const speech = msg?.properties?.speech ?? {};
-      // Try common speaker indicators
       return (speech.speaker === "replica") || (speech.role === "replica") || (msg?.speaker === "replica");
     }
 
-    // ---------- Tavus: Create conversation ----------
     async function createConversation() {
       status("Creating conversation…");
 
@@ -194,7 +185,6 @@
           persona_id: PERSONA_ID,
           conversation_name: "Team Onboarding",
           custom_greeting: GREETING
-          // You can also pass conversational_context if helpful
         })
       });
 
@@ -204,14 +194,12 @@
       }
 
       const data = await res.json();
-      // data includes conversation_id + conversation_url (Daily link)
       return {
         id: data.conversation_id,
         url: data.conversation_url
       };
     }
 
-    // ---------- Join call via Daily and wire interactions ----------
     async function startConversation() {
       $("#startBtn").disabled = true;
       $("#sendButton").disabled = true;
@@ -221,7 +209,6 @@
         conversationId = id;
         $("#convIdLabel").textContent = conversationId ? `ID: ${conversationId}` : "";
 
-        // Create Daily frame (Tavus CVI is powered by Daily)
         call = window.Daily.createFrame({
           iframeStyle: {
             width: "100%", height: "640px", border: "0"
@@ -238,13 +225,10 @@
           }
         });
 
-        // Listen for interaction/observable events coming from the replica
         call.on("app-message", (event) => {
-          // event.data should hold the Tavus interaction payload
           const msg = event?.data || event;
           const type = msg?.event_type || "";
 
-          // Display replica utterances in the chat
           if (type === "conversation.utterance") {
             const text = extractUtteranceText(msg);
             if (isReplicaUtterance(msg)) {
@@ -253,20 +237,19 @@
               addMsg(text, "user");
             }
           }
-
-          // You can also handle tool calls, speaking state, etc.
-          // e.g., conversation.tool_call, conversation.replica_started_speaking, etc.
-          // console.log("app-message:", msg);
         });
 
-        // When the iframe loads, fade it in
         call.iframe.onload = () => call.iframe.classList.add("loaded");
 
-        // Join the Daily room for the conversation
         await call.join({ url });
-        $("#videoPanel").appendChild(call.iframe);
 
-        // Enable controls
+        // ✅ Minimal patch: Safe append + always enable buttons
+        if (call && call.iframe) {
+          $("#videoPanel").appendChild(call.iframe);
+        } else {
+          console.error("Daily iframe not created");
+        }
+
         $("#sendButton").disabled = false;
         $("#leaveBtn").disabled = false;
         status("Connected. You can chat now.");
@@ -294,7 +277,6 @@
       }
     }
 
-    // ---------- Send a text message to the avatar ----------
     function sendTextToAvatar(text) {
       if (!call || !conversationId) {
         status("No active conversation.");
@@ -304,19 +286,17 @@
 
       const interaction = {
         message_type: "conversation",
-        event_type: "conversation.respond", // instructs the replica to respond to provided text
+        event_type: "conversation.respond",
         conversation_id: conversationId,
         properties: {
-          modality: "text", // explicit modality (text or audio)
+          modality: "text",
           text: text
         }
       };
 
-      // Deliver over Daily's app-message channel to the CVI
       call.sendAppMessage(interaction, "*");
     }
 
-    // ---------- Wire up UI ----------
     $("#startBtn").addEventListener("click", startConversation);
     $("#leaveBtn").addEventListener("click", leaveConversation);
 
@@ -325,13 +305,8 @@
       const text = input.value.trim();
       if (!text) return;
 
-      // Show user's message immediately
       addMsg(text, "user");
-
-      // Send to Tavus replica
       sendTextToAvatar(text);
-
-      // UX nicety
       input.value = "";
       input.focus();
     });
